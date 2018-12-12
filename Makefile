@@ -105,6 +105,37 @@ RISCV_AR      := $(abspath $(RISCV_PATH)/bin/riscv64-unknown-elf-ar)
 PATH := $(abspath $(RISCV_PATH)/bin):$(PATH)
 
 #############################################################
+# This Section is for MEE Compilation
+#############################################################
+
+MEE_SOURCE_PATH	= freedom-mee
+
+MEE_BSP_PATH ?= $(abspath bsp/mee/$(BOARD))
+
+MEE_LDSCRIPT	   = $(MEE_BSP_PATH)/riscv__mmachine__$(BOARD).lds
+MEE_SPECS 	   = $(MEE_BSP_PATH)/riscv__mmachine__$(BOARD).specs
+MEE_HEADER	   = $(MEE_BSP_PATH)/$(BOARD).h
+MEE_MAKEATTRIBUTES = $(MEE_BSP_PATH)/$(BOARD).mk
+
+mee_clean:
+	make -C $(MEE_SOURCE_PATH) clean
+	rm -rf $(MEE_SOURCE_PATH)/Makefile
+
+mee_configure: $(MEE_SOURCE_PATH)/Makefile
+$(MEE_SOURCE_PATH)/Makefile:
+	cd $(MEE_SOURCE_PATH) && ./configure \
+		--host=riscv64-sifive-elf \
+		--with-preconfigured \
+		--with-machine-name=$(BOARD) \
+		--with-machine-header=$(MEE_HEADER) \
+		--with-machine-ldscript=$(MEE_LDSCRIPT) \
+		--with-machine-specs=$(MEE_SPECS) \
+		--with-machine-makeattributes=$(MEE_MAKEATTRIBUTES)
+
+mee: mee_configure
+	$(MAKE) -C $(MEE_SOURCE_PATH)
+
+#############################################################
 # This Section is for Software Compilation
 #############################################################
 PROGRAM_DIR = software/$(PROGRAM)
