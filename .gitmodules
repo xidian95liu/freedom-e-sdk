@@ -1,0 +1,4 @@
+[submodule "freedom-mee"]
+	path = freedom-mee
+	url = https://github.com/sifive/freedom-mee.git
+	branch = build-preconfigured
