@@ -1,0 +1,26 @@
+%rename asm  mee_machine__asm
+*asm:
+-march=rv32imac -mabi=ilp32 %(mee_machine__asm)
+
+%rename cpp  mee_machine__cpp
+*cpp:
+-D__MEE_MACHINE_HEADER="mee/machine/sifive-hifive1.h" %(mee_machine__cpp)
+
+%rename cc1  mee_machine__cc1
+*cc1:
+-ffunction-sections -fdata-sections -march=rv32imac -mabi=ilp32 %(mee_machine__cc1)
+
+%rename cc1plus  mee_machine__cc1plus
+*cc1plus:
+-ffunction-sections -fdata-sections -march=rv32imac -mabi=ilp32 %(mee_machine__cc1plus)
+
+*startfile:
+%{!nostartfiles:/scratch/nathanielg/freedom-sdk/usr/riscv64-sifive-elf/lib/rv32imac/ilp32/crt0__mee.o /scratch/nathanielg/freedom-sdk/usr/lib/gcc/riscv64-sifive-elf/8.1.0/rv32imac/ilp32/crtbegin.o}
+
+*endfile:
+%{!nostartfiles:/scratch/nathanielg/freedom-sdk/usr/lib/gcc/riscv64-sifive-elf/8.1.0/rv32imac/ilp32/crtend.o}
+
+%rename link   mee_machine__link
+*link:
+%{!T*:-Triscv__mmachine__sifive-hifive1.lds} --gc-sections -march=rv32imac -mabi=ilp32 -melf32lriscv -L/scratch/nathanielg/freedom-sdk/usr/riscv64-sifive-elf/lib/rv32imac/ilp32/ -L/scratch/nathanielg/freedom-sdk/usr/lib/gcc/riscv64-sifive-elf/8.1.0/rv32imac/ilp32/ %{!nostdlib:-lgcc} %(mee_machine__link)
+
