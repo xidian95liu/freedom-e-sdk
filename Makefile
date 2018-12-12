@@ -12,10 +12,23 @@ include $(extra_configs)
 endif
 
 # Default target
+
+# legacy for old e-sdk or mee
+BSP ?= legacy
+
+ifeq ($(BSP),legacy)
+BSP_SUBDIR ?= env
 BOARD ?= freedom-e300-hifive1
 PROGRAM ?= demo_gpio
 LINK_TARGET ?= flash
 GDB_PORT ?= 3333
+
+else # MEE
+BSP_SUBDIR ?= mee
+BOARD ?= sifive-hifive1
+PROGRAM ?= mee_hello
+
+endif # $(BSP)
 
 # Variables the user probably shouldn't override.
 builddir := work/build
@@ -26,7 +39,7 @@ builddir := work/build
 
 # Finds the directory in which this BSP is located, ensuring that there is
 # exactly one.
-board_dir := $(wildcard bsp/env/$(BOARD))
+board_dir := $(wildcard bsp/$(BSP_SUBDIR)/$(BOARD))
 ifeq ($(words $(board_dir)),0)
 $(error Unable to find BSP for $(BOARD), expected to find either "bsp/$(BOARD)" or "bsp-addons/$(BOARD)")
 endif
@@ -34,10 +47,19 @@ ifneq ($(words $(board_dir)),1)
 $(error Found multiple BSPs for $(BOARD): "$(board_dir)")
 endif
 
+ifeq ($(BSP), mee)
+
+include $(board_dir)/sifive-hifive1.mk
+RISCV_ARCH = $(FRAMEWORK_BOARD_DTS_MARCH)
+RISCV_ABI = $(FRAMEWORK_BOARD_DTS_MABI)
+
+else
+
 # There must be a settings makefile fragment in the BSP's board directory.
 ifeq ($(wildcard $(board_dir)/settings.mk),)
 $(error Unable to find BSP for $(BOARD), expected to find $(board_dir)/settings.mk)
 endif
+
 include $(board_dir)/settings.mk
 
 ifeq ($(RISCV_ARCH),)
@@ -46,6 +68,8 @@ endif
 
 ifeq ($(RISCV_ABI),)
 $(error $(board_dir)/board.mk must set RISCV_ABI, the ABI to target)
+endif
+
 endif
 
 # Determines the XLEN from the toolchain tuple
@@ -68,6 +92,9 @@ help:
 	@echo " software [PROGRAM=$(PROGRAM) BOARD=$(BOARD)]:"
 	@echo "    Build a software program to load with the"
 	@echo "    debugger."
+	@echo ""
+	@echo " mee BSP=mee [BOARD=sifive-hifive1]"
+	@echo "    Build the MEE library for BOARD"
 	@echo ""
 	@echo " clean [PROGRAM=$(PROGRAM) BOARD=$(BOARD)]:"
 	@echo "    Clean compiled objects for a specified "
