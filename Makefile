@@ -152,6 +152,7 @@ mee_configure: $(MEE_SOURCE_PATH)/Makefile
 $(MEE_SOURCE_PATH)/Makefile:
 	cd $(MEE_SOURCE_PATH) && ./configure \
 		--host=riscv64-sifive-elf \
+		--prefix=$(MEE_BSP_PATH) \
 		--with-preconfigured \
 		--with-machine-name=$(BOARD) \
 		--with-machine-header=$(MEE_HEADER) \
@@ -161,6 +162,9 @@ $(MEE_SOURCE_PATH)/Makefile:
 
 mee: mee_configure
 	$(MAKE) -C $(MEE_SOURCE_PATH)
+
+mee_install: mee
+	$(MAKE) -C $(MEE_SOURCE_PATH) install
 
 #############################################################
 # This Section is for Software Compilation
