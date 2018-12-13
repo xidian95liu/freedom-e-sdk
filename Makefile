@@ -116,6 +116,9 @@ help:
 	@echo ""
 	@echo " For more information, visit dev.sifive.com"
 
+.PHONY: clean
+clean:
+
 #############################################################
 # This section is for tool configuration
 #############################################################
@@ -175,6 +178,12 @@ $(MEE_BSP_PATH)/install/lib/libmee.a: $(MEE_BSP_PATH)/install/lib/libriscv__mmac
 
 $(MEE_BSP_PATH)/install/lib/libmee-gloss.a: $(MEE_BSP_PATH)/install/lib/libriscv__menv__mee.a
 	cp $< $@
+
+.PHONY: clean-mee
+clean-mee:
+	rm -rf $(MEE_BSP_PATH)/install
+	rm -rf $(MEE_BSP_PATH)/build
+clean: clean-mee
 endif
 
 mee_install: mee
@@ -198,9 +207,15 @@ $(PROGRAM_ELF): \
 		CC=$(RISCV_GCC) \
 		CXX=$(RISCV_GXX) \
 		CFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
+		CXXFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
 		LDFLAGS="-nostartfiles -nostdlib -L$(sort $(dir $(abspath $(filter %.a,$^)))) -T$(abspath $(filter %.lds,$^))" \
 		LDLIBS="-Wl,--start-group -lc -lmee -lmee-gloss -Wl,--end-group"
 	touch -c $@
+
+.PHONY: clean-software
+clean-software:
+	$(MAKE) -C $(dir $(PROGRAM_ELF)) clean
+clean: clean-software
 
 else
 PROGRAM_DIR=$(dir $(PROGRAM_ELF))
