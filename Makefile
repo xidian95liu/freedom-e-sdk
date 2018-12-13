@@ -27,15 +27,13 @@ LINK_TARGET ?= flash
 GDB_PORT ?= 3333
 
 else # MEE
-BSP_SUBDIR ?= mee
+BSP_SUBDIR ?= 
+PROGRAM ?= hello
 BOARD ?= sifive-hifive1
-PROGRAM ?= mee_hello
 
 endif # $(BSP)
 
 # Variables the user probably shouldn't override.
-builddir := work/build
-
 #############################################################
 # BSP Loading
 #############################################################
@@ -52,9 +50,7 @@ endif
 
 ifeq ($(BSP), mee)
 
-include $(board_dir)/sifive-hifive1.mk
-RISCV_ARCH = $(FRAMEWORK_BOARD_DTS_MARCH)
-RISCV_ABI = $(FRAMEWORK_BOARD_DTS_MABI)
+include $(board_dir)/settings.mk
 
 else
 
@@ -92,12 +88,15 @@ help:
 	@echo "  SiFive Freedom E Software Development Kit "
 	@echo "  Makefile targets:"
 	@echo ""
-	@echo " software [PROGRAM=$(PROGRAM) BOARD=$(BOARD)]:"
+	@echo " software BSP=legacy [PROGRAM=$(PROGRAM) BOARD=$(BOARD)]:"
 	@echo "    Build a software program to load with the"
 	@echo "    debugger."
 	@echo ""
-	@echo " mee BSP=mee [BOARD=sifive-hifive1]"
+	@echo " mee BSP=mee [BOARD=$(BOARD)]"
 	@echo "    Build the MEE library for BOARD"
+	@echo ""
+	@echo " examples BSP=mee [BOARD=$(BOARD)]"
+	@echo "     Build all the examples for the given board."
 	@echo ""
 	@echo " clean [PROGRAM=$(PROGRAM) BOARD=$(BOARD)]:"
 	@echo "    Clean compiled objects for a specified "
@@ -121,50 +120,62 @@ help:
 # This section is for tool configuration
 #############################################################
 
-toolchain_builddir := $(builddir)/riscv-gnu-toolchain/riscv64-unknown-elf
-toolchain_prefix := $(toolchain_builddir)/prefix
-
-RISCV_PATH ?= $(toolchain_prefix)
-
+# If users don't specify RISCV_PATH then assume that the tools will just be in
+# their path.
+ifeq ($(RISCV_PATH),)
+RISCV_GCC     := $(CROSS_COMPILE)-gcc
+RISCV_GXX     := $(CROSS_COMPILE)-g++
+RISCV_OBJDUMP := $(CROSS_COMPILE)-objdump
+RISCV_GDB     := $(CROSS_COMPILE)-gdb
+RISCV_AR      := $(CROSS_COMPILE)-ar
+else
 RISCV_GCC     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-gcc)
 RISCV_GXX     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-g++)
 RISCV_OBJDUMP := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-objdump)
 RISCV_GDB     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-gdb)
 RISCV_AR      := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-ar)
-
-PATH := $(abspath $(RISCV_PATH)/bin):$(PATH)
+PATH          := $(abspath $(RISCV_PATH)/bin):$(PATH)
+endif
 
 #############################################################
-# This Section is for MEE Compilation
+# Compiles an instance of the MEE targeted at $(BOARD)
 #############################################################
+ifeq ($(BSP),mee)
+MEE_SOURCE_PATH	  ?= freedom-mee
+MEE_BSP_PATH       = bsp/$(BOARD)
+MEE_LDSCRIPT	   = $(MEE_BSP_PATH)/mee.lds
+MEE_HEADER	   = $(MEE_BSP_PATH)/mee.h
 
-MEE_SOURCE_PATH	= freedom-mee
+.PHONY: mee
+mee: $(MEE_BSP_PATH)/install/stamp
 
-MEE_BSP_PATH ?= $(abspath bsp/mee/$(BOARD))
-
-MEE_LDSCRIPT	   = $(MEE_BSP_PATH)/riscv__mmachine__$(BOARD).lds
-MEE_SPECS 	   = $(MEE_BSP_PATH)/riscv__mmachine__$(BOARD).specs
-MEE_HEADER	   = $(MEE_BSP_PATH)/$(BOARD).h
-MEE_MAKEATTRIBUTES = $(MEE_BSP_PATH)/$(BOARD).mk
-
-mee_clean:
-	make -C $(MEE_SOURCE_PATH) clean
-	rm -rf $(MEE_SOURCE_PATH)/Makefile
-
-mee_configure: $(MEE_SOURCE_PATH)/Makefile
-$(MEE_SOURCE_PATH)/Makefile:
-	cd $(MEE_SOURCE_PATH) && ./configure \
-		--host=riscv64-sifive-elf \
-		--prefix=$(MEE_BSP_PATH) \
+$(MEE_BSP_PATH)/build/Makefile:
+	@rm -rf $(dir $@)
+	@mkdir -p $(dir $@)
+	cd $(dir $@) && \
+		CFLAGS="-march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
+		$(abspath $(MEE_SOURCE_PATH)/configure) \
+		--host=$(CROSS_COMPILE) \
+		--prefix=$(abspath $(MEE_BSP_PATH)/install) \
 		--with-preconfigured \
 		--with-machine-name=$(BOARD) \
-		--with-machine-header=$(MEE_HEADER) \
-		--with-machine-ldscript=$(MEE_LDSCRIPT) \
-		--with-machine-specs=$(MEE_SPECS) \
-		--with-machine-makeattributes=$(MEE_MAKEATTRIBUTES)
+		--with-machine-header=$(abspath $(MEE_HEADER)) \
+		--with-machine-ldscript=$(abspath $(MEE_LDSCRIPT)) \
+		--with-builtin-libgloss
+	touch -c $@
 
-mee: mee_configure
-	$(MAKE) -C $(MEE_SOURCE_PATH)
+$(MEE_BSP_PATH)/install/stamp: $(MEE_BSP_PATH)/build/Makefile
+	$(MAKE) -C $(abspath $(MEE_BSP_PATH)/build) install
+	date > $@
+
+$(MEE_BSP_PATH)/install/lib/libriscv%.a: $(MEE_BSP_PATH)/install/stamp ;@:
+
+$(MEE_BSP_PATH)/install/lib/libmee.a: $(MEE_BSP_PATH)/install/lib/libriscv__mmachine__$(BOARD).a
+	cp $< $@
+
+$(MEE_BSP_PATH)/install/lib/libmee-gloss.a: $(MEE_BSP_PATH)/install/lib/libriscv__menv__mee.a
+	cp $< $@
+endif
 
 mee_install: mee
 	$(MAKE) -C $(MEE_SOURCE_PATH) install
@@ -172,8 +183,27 @@ mee_install: mee
 #############################################################
 # This Section is for Software Compilation
 #############################################################
-PROGRAM_DIR = software/$(PROGRAM)
 PROGRAM_ELF = software/$(PROGRAM)/$(PROGRAM)
+
+ifeq ($(BSP),mee)
+.PHONY: software
+software: $(PROGRAM_ELF)
+
+$(PROGRAM_ELF): \
+		$(shell find $(abspath $(dir $(PROGRAM_ELF))) -type f) \
+		$(MEE_BSP_PATH)/install/lib/libmee.a \
+		$(MEE_BSP_PATH)/install/lib/libmee-gloss.a \
+		$(MEE_BSP_PATH)/mee.lds
+	$(MAKE) -C $(dir $@) $(notdir $@) \
+		CC=$(RISCV_GCC) \
+		CXX=$(RISCV_GXX) \
+		CFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
+		LDFLAGS="-nostartfiles -nostdlib -L$(sort $(dir $(abspath $(filter %.a,$^)))) -T$(abspath $(filter %.lds,$^))" \
+		LDLIBS="-Wl,--start-group -lc -lmee -lmee-gloss -Wl,--end-group"
+	touch -c $@
+
+else
+PROGRAM_DIR=$(dir $(PROGRAM_ELF))
 
 .PHONY: software_clean
 clean: software_clean
@@ -186,6 +216,7 @@ software: software_clean
 
 dasm: software $(RISCV_OBJDUMP)
 	$(RISCV_OBJDUMP) -D $(PROGRAM_ELF)
+endif
 
 #############################################################
 # This Section is for uploading a program to SPI Flash
