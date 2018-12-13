@@ -17,3 +17,6 @@ software/smp/smp
 
 bsp/*/build
 bsp/*/install
+
+/Makefile.local
+/enter.bash
