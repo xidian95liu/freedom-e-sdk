@@ -5,3 +5,6 @@
 [submodule "software/mee-hello"]
 	path = software/mee-hello
 	url = https://github.com/sifive/mee-hello.git
+[submodule "software/hello"]
+	path = software/hello
+	url = ../example-hello
