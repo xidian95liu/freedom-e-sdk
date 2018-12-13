@@ -2,3 +2,6 @@
 	path = freedom-mee
 	url = https://github.com/sifive/freedom-mee.git
 	branch = build-preconfigured
+[submodule "software/mee-hello"]
+	path = software/mee-hello
+	url = https://github.com/sifive/mee-hello.git
