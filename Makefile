@@ -131,12 +131,14 @@ RISCV_GXX     := $(CROSS_COMPILE)-g++
 RISCV_OBJDUMP := $(CROSS_COMPILE)-objdump
 RISCV_GDB     := $(CROSS_COMPILE)-gdb
 RISCV_AR      := $(CROSS_COMPILE)-ar
+RISCV_OPENOCD := openocd
 else
 RISCV_GCC     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-gcc)
 RISCV_GXX     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-g++)
 RISCV_OBJDUMP := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-objdump)
 RISCV_GDB     := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-gdb)
 RISCV_AR      := $(abspath $(RISCV_PATH)/bin/$(CROSS_COMPILE)-ar)
+RISCV_OPENOCD := $(abspath $(RISCV_PATH)/bin/openocd)
 PATH          := $(abspath $(RISCV_PATH)/bin):$(PATH)
 endif
 
@@ -156,7 +158,7 @@ $(MEE_BSP_PATH)/build/Makefile:
 	@rm -rf $(dir $@)
 	@mkdir -p $(dir $@)
 	cd $(dir $@) && \
-		CFLAGS="-march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
+		CFLAGS="-march=$(RISCV_ARCH) -mabi=$(RISCV_ABI) -g" \
 		$(abspath $(MEE_SOURCE_PATH)/configure) \
 		--host=$(CROSS_COMPILE) \
 		--prefix=$(abspath $(MEE_BSP_PATH)/install) \
@@ -206,8 +208,8 @@ $(PROGRAM_ELF): \
 	$(MAKE) -C $(dir $@) $(notdir $@) \
 		CC=$(RISCV_GCC) \
 		CXX=$(RISCV_GXX) \
-		CFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
-		CXXFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI)" \
+		CFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI) -g" \
+		CXXFLAGS="-Os -march=$(RISCV_ARCH) -mabi=$(RISCV_ABI) -g" \
 		LDFLAGS="-nostartfiles -nostdlib -L$(sort $(dir $(abspath $(filter %.a,$^)))) -T$(abspath $(filter %.lds,$^))" \
 		LDLIBS="-Wl,--start-group -lc -lmee -lmee-gloss -Wl,--end-group"
 	touch -c $@
@@ -236,6 +238,13 @@ endif
 #############################################################
 # This Section is for uploading a program to SPI Flash
 #############################################################
+ifeq ($(BSP),mee)
+upload: $(PROGRAM_ELF)
+	scripts/upload --elf $(PROGRAM_ELF) --openocd $(RISCV_OPENOCD) --gdb $(RISCV_GDB) --openocd-config bsp/$(BOARD)/openocd.cfg
+
+debug: $(PROGRAM_ELF)
+	scripts/debug --elf $(PROGRAM_ELF) --openocd $(RISCV_OPENOCD) --gdb $(RISCV_GDB) --openocd-config bsp/$(BOARD)/openocd.cfg
+else
 OPENOCDCFG ?= bsp/env/$(BOARD)/openocd.cfg
 OPENOCDARGS += -f $(OPENOCDCFG)
 
@@ -254,6 +263,7 @@ upload:
 	$(RISCV_OPENOCD) $(OPENOCDARGS) & \
 	$(RISCV_GDB) $(PROGRAM_DIR)/$(PROGRAM) $(GDB_UPLOAD_ARGS) $(GDB_UPLOAD_CMDS) && \
 	echo "Successfully uploaded '$(PROGRAM)' to $(BOARD)."
+endif
 
 #############################################################
 # This Section is for launching the debugger
